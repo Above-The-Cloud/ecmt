@@ -19,3 +19,4 @@ uwsgi
 static
 **/__pycache__
 **/migrations
+media/
