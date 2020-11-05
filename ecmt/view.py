@@ -30,4 +30,3 @@ def Profession_insert(request):
 	f.close() #关闭文件
 
 	return HttpResponse("<p>专业添加成功！</p>")
-          

@@ -6,6 +6,7 @@ class comment_info(models.Model):
 	comment_id = models.AutoField(primary_key=True)
 	user_id = models.IntegerField(default=1)
 	res_id = models.IntegerField(default=1)
+	show_user = models.IntegerField(default=1)
 	cmt_type = models.CharField(max_length=10,default='课程')
 	score = models.FloatField(default=0.0)
 	comment = models.CharField(max_length=1000,default='')

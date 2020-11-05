@@ -123,6 +123,7 @@ def submit_comment(request):
 	try:
 		current_id = str(request.POST['res_id'])
 		typeof_cmt = request.POST['res_type']
+		isshow = request.POST['show_user']
 		userid = request.POST['user_id'].strip()
 		submit_score = float(request.POST['score'].strip())
 		submit_comment = request.POST['comment'].strip()
@@ -139,7 +140,7 @@ def submit_comment(request):
 				res = {'code':-1, 'msg':'您的打分被系统判定为无效，请重新打分！', 'data':[]}
 				return HttpResponse(json.dumps(res))
 			else:
-				insert = comment_info(res_id=current_id,cmt_type=typeof_cmt,user_id=userid,score=submit_score,comment=submit_comment)
+				insert = comment_info(res_id=current_id,cmt_type=typeof_cmt,user_id=userid,score=submit_score,comment=submit_comment,show_user=isshow)
 				insert.save()
 				sum_userstar = 0
 				sum_score = 0.0

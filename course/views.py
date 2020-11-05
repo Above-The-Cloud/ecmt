@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 import json
 import traceback
-
+import os
+import xlrd
+from ecmt import settings
 from django.core import serializers
 from django.http import HttpResponse
 from django.shortcuts import render
 from pypinyin import lazy_pinyin
-# Create your views here.
 from django.views.decorators.csrf import csrf_exempt
 
 from user.models import UserInfo
@@ -153,4 +154,131 @@ def addTeaching(request):
 	#print(res)
 	return HttpResponse(json.dumps(res))
 
+def addSingleRecord(courseFile, planFile, proID):
+	data = xlrd.open_workbook(os.path.join(settings.BASE_DIR,"ecmt","profession_plans",planFile))
+	table = data.sheet_by_index(0)
+	dataFile = {}
+	for rowNum in range(table.nrows):		
+		data_row = table.row_values(rowNum)
+		#print(data_row)
+		if data_row[1] == '':
+			continue
+		if data_row[1] in courseFile.keys():
+			courseFile[data_row[1]]['proIDs'] = courseFile[data_row[1]]['proIDs'] + str(proID) + '#'
+			#print(data_row)
+			#print(courseFile[data_row[1]]['proIDs'])
+	return courseFile
 
+@csrf_exempt	
+def addProfessionToCourses(request):
+	request.encoding = 'utf-8'
+	res = {'code':-1, 'msg':'error', 'data':{}}
+	try:
+		userid = request.GET['userid']
+		password = request.GET['password']
+		if userid != 'ecmtadmin' or password != 'ecmtadmin':
+			res = {'code':-2, 'msg':'userid or password error', 'data':{}}
+			return HttpResponse(json.dumps(res))
+		fileList = os.listdir(os.path.join(settings.BASE_DIR,"ecmt","profession_plans"))
+		courseFile = json.load(open('course/courseList.json', 'r', encoding="utf-8"))
+		print(len(courseFile))
+		ignore_pro = []
+		for planFile in fileList:
+			proName = planFile.split('.')[0]
+			qset = Profession.objects.filter(name=proName)
+			if len(qset) == 0:
+				ignore_pro.append(proName)
+				continue
+			ts = json.loads(serializers.serialize("json", qset))
+			proID = ts[0]['pk']
+			courseFile = addSingleRecord(courseFile, planFile, proID)
+			#print(proName)
+		print(len(courseFile))
+		json.dump(courseFile, open('course/courseListFull.json', "w", encoding="utf-8"))
+		res = {'code': 0, 'msg':'添加课程面向专业成功', 'data': ignore_pro } 
+	except Exception as e:
+		res = {'code': -3, 'msg': e, 'data': []}
+		traceback.print_exc()
+	#print(res)
+	return HttpResponse(json.dumps(res))
+
+@csrf_exempt
+def deleteAllTable(request):
+	res = {'code':-1, 'msg':'error', 'data':{}}
+	try:
+		userid = request.GET['userid']
+		password = request.GET['password']
+		if userid != 'ecmtadmin' or password != 'ecmtadmin':
+			res = {'code':-2, 'msg':'userid or password error', 'data':{}}
+			return HttpResponse(json.dumps(res))
+		#清空数据表，谨慎操作
+		cursor=connection.cursor()
+		sql = 'delete from course_courseinfo'
+		cursor.execute(sql)
+		sql = 'delete from course_teaching'
+		cursor.execute(sql)
+		sql = 'delete from comment_comment_info'
+		cursor.execute(sql)
+		sql = 'delete from comment_dynamics'
+		cursor.execute(sql)
+		sql2 = 'alter table course_courseinfo AUTO_INCREMENT 1' 
+		cursor.execute(sql2)
+		sql2 = 'alter table course_teaching AUTO_INCREMENT 1' 
+		cursor.execute(sql2)
+		sql2 = 'alter table comment_comment_info AUTO_INCREMENT 1' 
+		cursor.execute(sql2)
+		sql2 = 'alter table comment_dynamics AUTO_INCREMENT 1' 
+		cursor.execute(sql2)
+		res = {'code': 0, 'msg':'delete all success', 'data':{}}
+	except Exception as e:
+		res = {'code': -3, 'msg': e, 'data': []}
+		traceback.print_exc()
+	#print(res)
+	return HttpResponse(json.dumps(res))
+
+@csrf_exempt
+def insertAllCourses(request):
+	request.encoding = 'utf-8'
+	res = {'code':-1, 'msg':'error', 'data':{}}
+	try:
+		userid = request.GET['userid']
+		password = request.GET['password']
+		null_teacher = []
+		multi_teacher =[]
+		index = 0
+		if userid == 'ecmtadmin' and password == 'ecmtadmin':
+			srcFile = json.load(open('course/courseListFull.json', 'r', encoding="utf-8"))
+			print(len(srcFile))
+			for key, value in srcFile.items():
+				#insert course here
+				#print(value)
+				#break
+				index += 1
+				if index % 500 == 0:
+					print(str(index) + ' OK')
+				if value['proIDs'] == '#':
+					value['proIDs'] = '#0#'
+				insert_course = courseinfo.objects.create(course_name=value['name'],course_type=value['type'],course_intro=value['introURL'],course_pro=value['proIDs'])
+				current_id = insert_course.course_id
+				print(current_id)
+				for teacher_name in value['teacher']:
+					qset = Teacher.objects.filter(name=teacher_name)
+					#insert teaching here
+					if len(qset) == 0:
+						null_teacher.append(teacher_name)
+					elif len(qset) > 1:
+						multi_teacher.append(teacher_name)
+					else:
+						ts = json.loads(serializers.serialize("json", qset))
+						tid = ts[0]['pk']
+						insert_teaching = teaching(course_id=current_id,teacher_id=tid)
+						insert_teaching.save()
+			#print(srcFile)
+			res = {'code':  0, 'msg': 'import all courses success', 'data': {'null_teacher': null_teacher, 'multi_teacher': multi_teacher} }
+		else:
+			res = {'code':  -1, 'msg': '授权失败', 'data': []}
+	except Exception as e:
+		res = {'code': -2, 'msg': e, 'data': []}
+		traceback.print_exc()
+	#print(res)
+	return HttpResponse(json.dumps(res))

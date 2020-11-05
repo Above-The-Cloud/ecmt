@@ -1,6 +1,8 @@
 import json
 import traceback
-
+import os
+from ecmt import settings
+from django.db import connection
 from django.core import serializers
 from django.http import HttpResponse
 from django.shortcuts import render
@@ -82,6 +84,30 @@ def listProfession(request):
         res['code']=0
         res['msg']='success'
         res['data']['professions'].sort(key=cmp_rule)
+    except Exception as e:
+        res['code'] = -2
+        res['msg'] = e
+        res['data'] = []
+    return HttpResponse(json.dumps(res))
+
+@csrf_exempt
+def deleteAndInsertProfession(request):
+    res = {'code': -1, 'msg': 'error', 'data': {}}
+    try:
+        f = open(os.path.join(settings.BASE_DIR,"ecmt","profession.txt"), "r", encoding="utf-8")   #设置文件对象
+        data = f.readlines()  #直接将文件中按行读到list里
+        cursor=connection.cursor()
+        sql = 'delete from teacher_profession'
+        cursor.execute(sql)
+        sql2 = 'alter table teacher_profession AUTO_INCREMENT 1' 
+        cursor.execute(sql2)
+        for i in range(0, len(data)):
+            if i == 0:
+                continue
+            insert = Profession(name=data[i].replace('\n', '').replace('\r', ''))
+            insert.save()
+        f.close() #关闭文件
+        res = {'code': 0, 'msg': '专业添加成功', 'data': data}
     except Exception as e:
         res['code'] = -2
         res['msg'] = e
