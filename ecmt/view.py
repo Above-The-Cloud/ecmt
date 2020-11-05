@@ -4,6 +4,7 @@ from teacher.models import Teacher,Dept, Profession
 from django.db import connection
 from ecmt import settings
 import os
+from django.views.decorators.csrf import csrf_exempt
 
 def hello(request):
 	return HttpResponse("Hello world ! ")
@@ -18,6 +19,7 @@ def Dept_insert(request):
 		insert.save()
 	return HttpResponse("<p>学院添加成功！</p>")
 
+@csrf_exempt
 def Profession_insert(request):
 	f = open(os.path.join(settings.BASE_DIR,"ecmt","profession.txt"),"r", encoding="utf-8")   #设置文件对象
 	data = f.readlines()  #直接将文件中按行读到list里
